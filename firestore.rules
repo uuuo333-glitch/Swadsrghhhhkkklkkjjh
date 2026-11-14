@@ -1,0 +1,223 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidPlatform(platform) {
+      return platform is string && platform in ['whatsapp', 'instagram', 'facebook', 'snapchat'];
+    }
+
+    function isValidDeliveryStatus(status) {
+      return status is string && status in ['sent', 'delivered', 'read', 'shielded_held', 'queued_offline'];
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 160)) &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('stealthDefaultEnabled' in data) || data.stealthDefaultEnabled is bool) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSocialAccount(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             isValidPlatform(data.platform) &&
+             data.handle is string && data.handle.size() <= 80 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.isConnected is bool &&
+             data.autoShieldNewChats is bool &&
+             data.hideReadReceipts is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidConversation(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.contactName is string && data.contactName.size() >= 1 && data.contactName.size() <= 80 &&
+             data.contactHandle is string && data.contactHandle.size() <= 80 &&
+             isValidPlatform(data.platform) &&
+             data.lastMessage is string && data.lastMessage.size() <= 500 &&
+             data.unreadCount is int && data.unreadCount >= 0 && data.unreadCount <= 10000 &&
+             data.shieldedCount is int && data.shieldedCount >= 0 && data.shieldedCount <= 10000 &&
+             data.isInternetCutOff is bool &&
+             data.silentReadOnly is bool &&
+             data.appearOnlineToContact is bool &&
+             data.isPinned is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChatMessage(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.conversationId is string && isValidId(data.conversationId) &&
+             data.text is string && data.text.size() <= 2000 &&
+             data.isOutgoing is bool &&
+             isValidDeliveryStatus(data.deliveryStatus) &&
+             (!('productId' in data) || data.productId == null || (data.productId is string && data.productId.size() <= 128)) &&
+             (!('productTitle' in data) || data.productTitle == null || (data.productTitle is string && data.productTitle.size() <= 100)) &&
+             (!('productPrice' in data) || data.productPrice == null || (data.productPrice is string && data.productPrice.size() <= 40)) &&
+             (!('productImageKey' in data) || data.productImageKey == null || (data.productImageKey is string && data.productImageKey.size() <= 500)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidCatalogItem(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+             data.description is string && data.description.size() <= 600 &&
+             (data.price is int || data.price is float) && data.price >= 0 && data.price <= 10000000 &&
+             data.currency is string && data.currency.size() >= 1 && data.currency.size() <= 10 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+             data.presetImageKey is string && data.presetImageKey.size() <= 500 &&
+             data.inStock is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'stealthDefaultEnabled', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'stealthDefaultEnabled', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // Linked Social Media Accounts
+      match /social_accounts/{accountId} {
+        allow get: if isOwner(userId) && isValidId(accountId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(accountId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'platform', 'handle', 'displayName', 'isConnected', 'autoShieldNewChats', 'hideReadReceipts', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'platform', 'handle', 'displayName', 'isConnected', 'autoShieldNewChats', 'hideReadReceipts', 'createdAt', 'updatedAt']) &&
+                         isValidSocialAccount(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(accountId) &&
+                         isValidSocialAccount(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().platform == existing().platform &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['handle', 'displayName', 'isConnected', 'autoShieldNewChats', 'hideReadReceipts', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(accountId);
+      }
+
+      // Unified Conversations
+      match /conversations/{conversationId} {
+        allow get: if isOwner(userId) && isValidId(conversationId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(conversationId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'contactName', 'contactHandle', 'platform', 'lastMessage', 'unreadCount', 'shieldedCount', 'isInternetCutOff', 'silentReadOnly', 'appearOnlineToContact', 'isPinned', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'contactName', 'contactHandle', 'platform', 'lastMessage', 'unreadCount', 'shieldedCount', 'isInternetCutOff', 'silentReadOnly', 'appearOnlineToContact', 'isPinned', 'createdAt', 'updatedAt']) &&
+                         isValidConversation(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(conversationId) &&
+                         isValidConversation(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().platform == existing().platform &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['contactName', 'contactHandle', 'lastMessage', 'unreadCount', 'shieldedCount', 'isInternetCutOff', 'silentReadOnly', 'appearOnlineToContact', 'isPinned', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(conversationId);
+
+        // Messages inside a Conversation (Parent Gate enforced)
+        match /messages/{messageId} {
+          allow get: if isOwner(userId) && isValidId(conversationId) && isValidId(messageId);
+          allow list: if isOwner(userId) && isValidId(conversationId);
+
+          allow create: if isOwner(userId) &&
+                           isValidId(conversationId) &&
+                           isValidId(messageId) &&
+                           incoming().userId == request.auth.uid &&
+                           incoming().conversationId == conversationId &&
+                           incoming().keys().hasAll(['userId', 'conversationId', 'text', 'isOutgoing', 'deliveryStatus', 'createdAt']) &&
+                           incoming().keys().hasOnly(['userId', 'conversationId', 'text', 'isOutgoing', 'deliveryStatus', 'productId', 'productTitle', 'productPrice', 'productImageKey', 'createdAt']) &&
+                           isValidChatMessage(incoming()) &&
+                           (exists(/databases/$(database)/documents/users/$(userId)/conversations/$(conversationId)) ||
+                            existsAfter(/databases/$(database)/documents/users/$(userId)/conversations/$(conversationId)));
+
+          allow update: if isOwner(userId) &&
+                           isValidId(conversationId) &&
+                           isValidId(messageId) &&
+                           isValidChatMessage(incoming()) &&
+                           incoming().userId == existing().userId &&
+                           incoming().conversationId == existing().conversationId &&
+                           incoming().createdAt == existing().createdAt &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['deliveryStatus']);
+
+          allow delete: if isOwner(userId) && isValidId(conversationId) && isValidId(messageId);
+        }
+      }
+
+      // Business Catalog Products
+      match /catalog/{itemId} {
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(itemId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'title', 'description', 'price', 'currency', 'category', 'presetImageKey', 'inStock', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'description', 'price', 'currency', 'category', 'presetImageKey', 'inStock', 'createdAt', 'updatedAt']) &&
+                         isValidCatalogItem(incoming());
+
+        allow update: if isOwner(userId) &&
+                         isValidId(itemId) &&
+                         isValidCatalogItem(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'price', 'currency', 'category', 'presetImageKey', 'inStock', 'updatedAt']);
+
+        allow delete: if isOwner(userId) && isValidId(itemId);
+      }
+    }
+  }
+}

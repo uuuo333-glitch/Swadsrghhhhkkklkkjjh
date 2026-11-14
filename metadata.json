@@ -1,0 +1,6 @@
+{
+  "name": "وصلة",
+  "description": "تطبيق محادثات موحد مع ميزة قطع الإنترنت عن محادثات محددة بدلاً من الحظر، وربط حسابات إنستغرام وفيسبوك وسناب شات ومنصات التواصل الاجتماعي.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

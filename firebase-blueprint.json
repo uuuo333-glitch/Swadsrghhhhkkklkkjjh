@@ -1,0 +1,316 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated Wasla user profile and global stealth privacy preferences.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name shown in the hub."
+        },
+        "email": {
+          "type": "string",
+          "description": "User email from Google Sign-In."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Profile avatar URL."
+        },
+        "stealthDefaultEnabled": {
+          "type": "boolean",
+          "description": "Whether new chats default to stealth network cutoff."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": ["userId", "displayName", "createdAt", "updatedAt"]
+    },
+    "SocialAccount": {
+      "title": "SocialAccount",
+      "description": "Linked social media messaging channel configuration (WhatsApp, Instagram, Facebook, Snapchat).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["whatsapp", "instagram", "facebook", "snapchat"],
+          "description": "Social platform identifier."
+        },
+        "handle": {
+          "type": "string",
+          "description": "Linked handle or phone number."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display label for the linked account."
+        },
+        "isConnected": {
+          "type": "boolean",
+          "description": "Connection state of this platform bridge."
+        },
+        "autoShieldNewChats": {
+          "type": "boolean",
+          "description": "Automatically cut off internet on incoming unfamiliar threads."
+        },
+        "hideReadReceipts": {
+          "type": "boolean",
+          "description": "Hide Seen/Blue ticks across this platform."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "platform",
+        "handle",
+        "displayName",
+        "isConnected",
+        "autoShieldNewChats",
+        "hideReadReceipts",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Conversation": {
+      "title": "Conversation",
+      "description": "Unified cross-platform chat thread with per-conversation stealth internet cutoff controls.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "contactName": {
+          "type": "string",
+          "description": "Contact display name."
+        },
+        "contactHandle": {
+          "type": "string",
+          "description": "Contact @handle or phone."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["whatsapp", "instagram", "facebook", "snapchat"],
+          "description": "Origin messaging platform."
+        },
+        "lastMessage": {
+          "type": "string",
+          "description": "Preview of the most recent message."
+        },
+        "unreadCount": {
+          "type": "integer",
+          "description": "Unread message count when online."
+        },
+        "shieldedCount": {
+          "type": "integer",
+          "description": "Messages held silently while internet is cut off for this chat."
+        },
+        "isInternetCutOff": {
+          "type": "boolean",
+          "description": "When true, internet is cut off for this conversation instead of blocking the contact."
+        },
+        "silentReadOnly": {
+          "type": "boolean",
+          "description": "Allows reading held messages without sending Seen/read receipts."
+        },
+        "appearOnlineToContact": {
+          "type": "boolean",
+          "description": "Keeps avatar, bio, and active presence visible so the contact never sees a block."
+        },
+        "isPinned": {
+          "type": "boolean",
+          "description": "Pinned status in inbox."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "contactName",
+        "contactHandle",
+        "platform",
+        "lastMessage",
+        "unreadCount",
+        "shieldedCount",
+        "isInternetCutOff",
+        "silentReadOnly",
+        "appearOnlineToContact",
+        "isPinned",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Individual message or shared catalog product card inside a conversation.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Parent conversation document ID."
+        },
+        "text": {
+          "type": "string",
+          "description": "Message body text."
+        },
+        "isOutgoing": {
+          "type": "boolean",
+          "description": "True if authored by the user, false if incoming."
+        },
+        "deliveryStatus": {
+          "type": "string",
+          "enum": ["sent", "delivered", "read", "shielded_held", "queued_offline"],
+          "description": "Delivery or stealth holding state."
+        },
+        "productId": {
+          "type": "string",
+          "description": "Optional attached catalog product ID."
+        },
+        "productTitle": {
+          "type": "string",
+          "description": "Optional attached catalog product title."
+        },
+        "productPrice": {
+          "type": "string",
+          "description": "Optional formatted catalog product price."
+        },
+        "productImageKey": {
+          "type": "string",
+          "description": "Optional catalog product image key or URI."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "conversationId",
+        "text",
+        "isOutgoing",
+        "deliveryStatus",
+        "createdAt"
+      ]
+    },
+    "CatalogItem": {
+      "title": "CatalogItem",
+      "description": "Business catalog product that can be showcased and sent directly into conversations.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID."
+        },
+        "title": {
+          "type": "string",
+          "description": "Product title."
+        },
+        "description": {
+          "type": "string",
+          "description": "Product description."
+        },
+        "price": {
+          "type": "number",
+          "description": "Numeric product price."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency symbol or code."
+        },
+        "category": {
+          "type": "string",
+          "description": "Catalog category."
+        },
+        "presetImageKey": {
+          "type": "string",
+          "description": "Drawable preset key or local photo URI."
+        },
+        "inStock": {
+          "type": "boolean",
+          "description": "Availability flag."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "description",
+        "price",
+        "currency",
+        "category",
+        "presetImageKey",
+        "inStock",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Owner user profile and global privacy settings."
+    },
+    "/users/{userId}/social_accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/SocialAccount" },
+      "description": "Linked social media accounts per user."
+    },
+    "/users/{userId}/conversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/Conversation" },
+      "description": "Unified conversations across WhatsApp, Instagram, Facebook, and Snapchat."
+    },
+    "/users/{userId}/conversations/{conversationId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages and shared catalog product cards in a conversation."
+    },
+    "/users/{userId}/catalog/{itemId}": {
+      "schema": { "$ref": "#/entities/CatalogItem" },
+      "description": "User product catalog items shareable in chats."
+    }
+  }
+}
